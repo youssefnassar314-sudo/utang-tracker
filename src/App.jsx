@@ -115,7 +115,7 @@ function App() {
     today.setHours(0,0,0,0);
     const due = new Date(dateString);
     const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
-    return diffDays <= 1;
+    return diffDays <= 3;
   };
 
   const totalPaidEverything = utangList.reduce((acc, item) => acc + (item.paidAmount || 0), 0);
