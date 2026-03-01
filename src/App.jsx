@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-// Import natin ang database connection at Firestore methods
 import { db } from './firebase'
 import { collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc, orderBy } from "firebase/firestore"
 
@@ -10,8 +9,11 @@ function App() {
   const [category, setCategory] = useState('Billease');
   const [dueDate, setDueDate] = useState('');
   const [search, setSearch] = useState('');
+  
+  // Feature: Dynamic Cutoff Period
+  const [period, setPeriod] = useState('1st'); 
+  const currentMonth = new Date().toLocaleString('default', { month: 'long' });
 
-  // Feature: Real-time Sync sa Firebase
   useEffect(() => {
     const q = query(collection(db, "utang"));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -26,7 +28,6 @@ function App() {
 
   const appList = ["Billease", "Shopee", "Lazada", "Atome", "JuanHand", "Cashify", "MocaMoca", "MabilisCash", "Cashalo", "Fido", "Tiktok", "Gcash", "Tala", "PesoLoan", "Uno Bank", "InvestEd"];
 
-  // Add sa Firebase
   const addUtang = async (e) => {
     e.preventDefault();
     if (!description || !amount || !dueDate) return;
@@ -42,7 +43,6 @@ function App() {
     setDescription(''); setAmount(''); setDueDate('');
   };
 
-  // Update sa Firebase
   const updatePartial = async (id, val) => {
     const pAmount = parseFloat(val) || 0;
     const utangRef = doc(db, "utang", id);
@@ -82,17 +82,52 @@ function App() {
     return diffDays <= 1;
   };
 
+  // Improved Filter: Search + Month/Period logic
   const filteredActive = utangList
-    .filter(i => !i.isPaid && (i.category.toLowerCase().includes(search.toLowerCase()) || i.description.toLowerCase().includes(search.toLowerCase())))
+    .filter(i => {
+      if (i.isPaid) return false;
+      
+      const dDate = new Date(i.dueDate);
+      const today = new Date();
+      
+      // Ipakita lang ang utang for the current month and year
+      const matchesMonth = dDate.getMonth() === today.getMonth() && dDate.getFullYear() === today.getFullYear();
+      if (!matchesMonth) return false;
+
+      // Filter by period (1-15 or 16-31)
+      const day = dDate.getDate();
+      const matchesPeriod = period === '1st' ? day <= 15 : day >= 16;
+      if (!matchesPeriod) return false;
+
+      // Search filter
+      return i.category.toLowerCase().includes(search.toLowerCase()) || 
+             i.description.toLowerCase().includes(search.toLowerCase());
+    })
     .sort((a, b) => isUrgent(a.dueDate) === isUrgent(b.dueDate) ? a.category.localeCompare(b.category) : isUrgent(a.dueDate) ? -1 : 1);
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 pb-20 flex justify-center font-sans">
       <div className="w-full max-w-md">
         
+        {/* Feature: Period Selector Buttons */}
+        <div className="flex gap-2 mb-4">
+          <button 
+            onClick={() => setPeriod('1st')}
+            className={`flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${period === '1st' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}
+          >
+            {currentMonth} 1-15
+          </button>
+          <button 
+            onClick={() => setPeriod('2nd')}
+            className={`flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${period === '2nd' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}
+          >
+            {currentMonth} 16-31
+          </button>
+        </div>
+
         {/* Dashboard */}
         <div className="bg-indigo-700 rounded-[2.5rem] p-8 shadow-xl mb-6 text-white text-center">
-          <p className="text-indigo-200 text-[10px] font-bold uppercase tracking-widest mb-1">Total Liability (Cloud)</p>
+          <p className="text-indigo-200 text-[10px] font-bold uppercase tracking-widest mb-1">Total Liability ({period === '1st' ? '1-15' : '16-31'})</p>
           <h1 className="text-5xl font-black tracking-tighter">
             ₱{filteredActive.reduce((a, b) => a + (b.amount - (b.paidAmount || 0)), 0).toLocaleString()}
           </h1>
