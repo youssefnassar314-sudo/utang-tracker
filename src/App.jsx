@@ -10,9 +10,12 @@ function App() {
   const [dueDate, setDueDate] = useState('');
   const [search, setSearch] = useState('');
   
-  // Feature: Dynamic Cutoff Period
+  // Feature: Month & Period Navigator
+  const [viewDate, setViewDate] = useState(new Date()); // Default: Ngayong buwan
   const [period, setPeriod] = useState('1st'); 
-  const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+  
+  const currentMonth = viewDate.toLocaleString('default', { month: 'long' });
+  const currentYear = viewDate.getFullYear();
 
   useEffect(() => {
     const q = query(collection(db, "utang"));
@@ -27,6 +30,19 @@ function App() {
   }, []);
 
   const appList = ["Billease", "Shopee", "Lazada", "Atome", "JuanHand", "Cashify", "MocaMoca", "MabilisCash", "Cashalo", "Fido", "Tiktok", "Gcash", "Tala", "PesoLoan", "Uno Bank", "InvestEd"];
+
+  // Navigation Functions
+  const nextMonth = () => {
+    const d = new Date(viewDate);
+    d.setMonth(d.getMonth() + 1);
+    setViewDate(d);
+  };
+
+  const prevMonth = () => {
+    const d = new Date(viewDate);
+    d.setMonth(d.getMonth() - 1);
+    setViewDate(d);
+  };
 
   const addUtang = async (e) => {
     e.preventDefault();
@@ -66,7 +82,7 @@ function App() {
   };
 
   const clearPaid = async () => {
-    if(window.confirm("Buburahin na lahat ng bayad sa history. Okay lang?")) {
+    if(window.confirm("Buburahin na lahat ng bayad sa history?")) {
       const paidOnly = utangList.filter(i => i.isPaid);
       paidOnly.forEach(async (item) => {
         await deleteDoc(doc(db, "utang", item.id));
@@ -82,24 +98,19 @@ function App() {
     return diffDays <= 1;
   };
 
-  // Improved Filter: Search + Month/Period logic
+  // Smart Filter: Current View Month + Period + Search
   const filteredActive = utangList
     .filter(i => {
       if (i.isPaid) return false;
-      
       const dDate = new Date(i.dueDate);
-      const today = new Date();
       
-      // Ipakita lang ang utang for the current month and year
-      const matchesMonth = dDate.getMonth() === today.getMonth() && dDate.getFullYear() === today.getFullYear();
+      const matchesMonth = dDate.getMonth() === viewDate.getMonth() && dDate.getFullYear() === viewDate.getFullYear();
       if (!matchesMonth) return false;
 
-      // Filter by period (1-15 or 16-31)
       const day = dDate.getDate();
       const matchesPeriod = period === '1st' ? day <= 15 : day >= 16;
       if (!matchesPeriod) return false;
 
-      // Search filter
       return i.category.toLowerCase().includes(search.toLowerCase()) || 
              i.description.toLowerCase().includes(search.toLowerCase());
     })
@@ -109,7 +120,16 @@ function App() {
     <div className="min-h-screen bg-slate-100 p-4 pb-20 flex justify-center font-sans">
       <div className="w-full max-w-md">
         
-        {/* Feature: Period Selector Buttons */}
+        {/* Feature: Month Navigator */}
+        <div className="flex justify-between items-center mb-4 px-2">
+          <button onClick={prevMonth} className="bg-white p-2 rounded-full shadow-sm text-indigo-600 font-bold hover:bg-indigo-50 active:scale-90 transition-all">←</button>
+          <h2 className="text-lg font-black text-slate-800 uppercase tracking-tighter">
+            {currentMonth} {currentYear}
+          </h2>
+          <button onClick={nextMonth} className="bg-white p-2 rounded-full shadow-sm text-indigo-600 font-bold hover:bg-indigo-50 active:scale-90 transition-all">→</button>
+        </div>
+
+        {/* Feature: Cutoff Selector Buttons */}
         <div className="flex gap-2 mb-4">
           <button 
             onClick={() => setPeriod('1st')}
@@ -139,13 +159,13 @@ function App() {
           type="text" placeholder="🔍 Search apps or notes..." value={search} onChange={(e) => setSearch(e.target.value)}
         />
 
-        {/* Form */}
+        {/* Input Form */}
         <div className="bg-white rounded-3xl p-6 shadow-sm mb-8 border border-slate-200">
           <form onSubmit={addUtang} className="space-y-4">
             <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none">
               {appList.map(app => <option key={app} value={app}>{app}</option>)}
             </select>
-            <input className="w-full bg-slate-50 rounded-xl px-4 py-3 outline-none" type="text" placeholder="Ano ito?" value={description} onChange={(e) => setDescription(e.target.value)} />
+            <input className="w-full bg-slate-50 rounded-xl px-4 py-3 outline-none" type="text" placeholder="Note (e.g. Weekly Payment)" value={description} onChange={(e) => setDescription(e.target.value)} />
             <div className="flex gap-2">
               <input className="w-1/2 bg-slate-50 rounded-xl px-4 py-3 outline-none" type="number" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
               <input className="w-1/2 bg-slate-50 rounded-xl px-4 py-3 outline-none text-slate-500 text-sm font-bold" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
@@ -159,7 +179,7 @@ function App() {
           {filteredActive.map((item) => {
             const urgent = isUrgent(item.dueDate);
             return (
-              <div key={item.id} className={`bg-white p-5 rounded-3xl flex flex-col transition-all border-2 ${urgent ? 'border-red-500 animate-pulse' : 'border-transparent shadow-sm'}`}>
+              <div key={item.id} className={`bg-white p-5 rounded-3xl flex flex-col transition-all border-2 ${urgent ? 'border-red-500 animate-pulse shadow-lg shadow-red-50' : 'border-transparent shadow-sm'}`}>
                 <div className="flex justify-between items-center w-full">
                   <div className="flex flex-col">
                     <span className={`text-[9px] font-black uppercase ${urgent ? 'text-red-600' : 'text-indigo-500'}`}>{item.category}</span>
@@ -180,7 +200,7 @@ function App() {
                     <input 
                       type="number" 
                       placeholder="Partial payment..." 
-                      className="w-full bg-slate-50 rounded-xl pl-6 pr-3 py-2 text-[11px] outline-none"
+                      className="w-full bg-slate-50 rounded-xl pl-6 pr-3 py-2 text-[11px] outline-none focus:ring-1 focus:ring-indigo-400"
                       value={item.paidAmount || ''} 
                       onChange={(e) => updatePartial(item.id, e.target.value)}
                     />
@@ -190,6 +210,9 @@ function App() {
               </div>
             );
           })}
+          {filteredActive.length === 0 && (
+            <p className="text-center text-slate-400 text-xs py-10 font-medium">Yehey! Walang utang sa period na ito. 🥳</p>
+          )}
         </div>
 
         {/* History */}
@@ -200,8 +223,8 @@ function App() {
            </div>
            {utangList.filter(i => i.isPaid).map((item) => (
              <div key={item.id} className="bg-slate-200 p-4 rounded-2xl mb-2 flex justify-between items-center">
-               <span className="line-through text-slate-500 text-xs font-bold">{item.category}: {item.description}</span>
-               <button onClick={() => togglePaid(item.id)} className="text-[10px] font-bold text-indigo-500 uppercase underline">Undo</button>
+               <span className="line-through text-slate-500 text-xs font-bold truncate pr-4">{item.category}: {item.description}</span>
+               <button onClick={() => togglePaid(item.id)} className="text-[10px] font-bold text-indigo-500 uppercase underline flex-shrink-0">Undo</button>
              </div>
            ))}
         </div>
