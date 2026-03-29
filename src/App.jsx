@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react'
 import { db } from './firebase'
-import { collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc, orderBy } from "firebase/firestore"
+import { collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc } from "firebase/firestore"
 
 function App() {
+  // --- LOGIN STATES ---
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const SECRET_PASSWORD = "admin"; // Dito mo palitan ang password mo
+
+  // --- EXISTING STATES ---
   const [utangList, setUtangList] = useState([]);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -15,6 +21,18 @@ function App() {
   
   const currentMonth = viewDate.toLocaleString('default', { month: 'long' });
   const currentYear = viewDate.getFullYear();
+
+  // --- LOGIN FUNCTION ---
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (passwordInput === SECRET_PASSWORD) {
+      setIsAuthenticated(true);
+      setPasswordInput('');
+    } else {
+      alert("Maling Password!");
+      setPasswordInput('');
+    }
+  };
 
   useEffect(() => {
     if ("Notification" in window) {
@@ -94,7 +112,6 @@ function App() {
     }
   };
 
-  // BAGONG LOGIC: Ginawa nating <= 3 para 3 days before ay "Urgent" na siya
   const isUrgent = (dateString) => {
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -116,7 +133,6 @@ function App() {
       if (!matchesPeriod) return false;
       return i.category.toLowerCase().includes(search.toLowerCase()) || i.description.toLowerCase().includes(search.toLowerCase());
     })
-    // LOGIC: Sort by Urgency First, then by Date (para sunod-sunod ang deadline)
     .sort((a, b) => {
       const urgentA = isUrgent(a.dueDate);
       const urgentB = isUrgent(b.dueDate);
@@ -124,10 +140,47 @@ function App() {
       return new Date(a.dueDate) - new Date(b.dueDate);
     });
 
+  // --- LOGIN SCREEN UI (Ito ang ipapakita kung hindi pa authenticated) ---
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl w-full max-w-sm text-center border border-slate-200">
+          <div className="text-5xl mb-6">🔒</div>
+          <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tighter">App is Locked</h2>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-8">Enter password to continue</p>
+          
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <input
+              type="password"
+              placeholder="Password"
+              className="w-full bg-slate-50 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-indigo-400 text-center text-lg tracking-[0.2em] font-bold text-slate-700"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="w-full bg-indigo-600 text-white font-black uppercase tracking-widest py-4 rounded-2xl shadow-lg active:scale-95 transition-all"
+            >
+              Unlock
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // --- MAIN APP UI ---
   return (
     <div className="min-h-screen bg-slate-100 p-4 pb-20 flex justify-center font-sans">
       <div className="w-full max-w-md">
         
+        {/* LOCK BUTTON (Dinagdag ko dito para makapag-lock ka ulit) */}
+        <div className="flex justify-end mb-2 px-2">
+          <button onClick={() => setIsAuthenticated(false)} className="text-[10px] font-bold text-rose-500 uppercase tracking-wider flex items-center gap-1 hover:text-rose-600 transition-colors">
+            <span className="text-sm">🔒</span> Lock App
+          </button>
+        </div>
+
         <div className="flex justify-between items-center mb-4 px-2">
           <button onClick={prevMonth} className="bg-white p-2 rounded-full shadow-sm text-indigo-600 font-bold hover:bg-indigo-50 active:scale-90 transition-all">←</button>
           <h2 className="text-lg font-black text-slate-800 uppercase tracking-tighter">{currentMonth} {currentYear}</h2>
